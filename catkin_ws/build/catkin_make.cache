@@ -1,0 +1,2 @@
+pongbot_leg2_v1
+-DCATKIN_DEVEL_PREFIX=/home/prakyath/catkin_ws/devel -DCMAKE_INSTALL_PREFIX=/home/prakyath/catkin_ws/install -G Unix Makefiles
