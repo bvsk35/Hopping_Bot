@@ -20,7 +20,7 @@ class local_estimate:
         self.components = components
         self.gmm_data = self.data
         self.means = None
-        self.covariances = NoneApplies
+        self.covariances = None
         self.NIW_id = 0
     '''
     Note: 
@@ -45,7 +45,8 @@ class local_estimate:
             return(A,B,C)
         else:
             return self.old()
-	'''
+
+    '''
     append_data method:
     This is a utilitary method which can be called seperatly to append the data from the system.
 	inputs:
@@ -61,8 +62,8 @@ class local_estimate:
         else:
             self.data = np.append(self.data,data,axis = 0)
         self.gmm_data = self.data
-	
-	'''
+
+    '''
 	Internal method 'GMM_method':
 	inputs:
 		Nothing
@@ -77,7 +78,7 @@ class local_estimate:
 	'''
 
     def GMM_method(self):
-        gmm = mixture.GaussianMixture(n_components = self.components , covariance_type = 'full')
+        gmm = mixture.GaussianMixture(n_components = self.components , covariance_type = 'full', max_iter=1000)
         gmm.fit(self.gmm_data)
         self.means = gmm.means_
         self.covariance = gmm.covariances_ 
@@ -97,7 +98,7 @@ class local_estimate:
         return (self.means[self.NIW_id,:],self.covariance[self.NIW_id,:,:])
         #here the r is the relevance of the size (1000,n_gaussian)
     
-	'''
+    '''
 	Internal method 'NIW_distribution'
 	inputs:
 		X: means from GMM
@@ -125,7 +126,7 @@ class local_estimate:
         #print('NIW mean',NIW_mean.shape)
         return(NIW_mean,NIW_cov)
 
-	'''
+    '''
 	Internal method 'old'
 	Inputs:
 		1. data
@@ -140,7 +141,7 @@ class local_estimate:
             self.covariances += np.dot((x-self.means),(x-self.means).T)
         self.covariances = self.covariances / (len(self.data) -1)
 
-	'''
+    '''
 	Internal method Post_predict
 	Inputs:
 		1. NIW posterior mean
