@@ -262,12 +262,15 @@ class CartPole(object):
     gen_rollouts: Generates specified no. of rollouts and outputs states, control action and cost of all rollouts
                     Variance of the Gaussian noise will be taken as input from a Unif(0, var_range) uniform distribution.
     '''
-    def gen_rollouts(self, x_initial, x_goal, u, n_rollouts, pattern, var_range, gamma, percent=20):
+    def gen_rollouts(self, x_initial, x_goal, u, n_rollouts, pattern='Normal', pattern_rand=False, var_range=10, gamma=0.2, percent=20):
         x_rollout = []
         u_rollout = []
         x_gmm = []
         cost = []
         for i in range(n_rollouts):
+            if pattern_rand == True:
+                pattern_seq = np.array(['Normal', 'MissingValue', 'Shuffle', 'TimeDelay', 'Extreme'])
+                pattern = pattern_seq[np.random.randint(0, 5, 1)][0]
             x_new, u_new = self.noise_traj_generator(x_initial, u, pattern, 0, np.random.uniform(0, var_range, 1), gamma, percent)
             x_new_temp = self.deaugment_state(x_new)
             cost.append(self.eval_traj_cost(x_new_temp, x_goal, u_new))
