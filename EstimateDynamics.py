@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
+#Importing the dependencies for the process
 import numpy as np
 from sklearn import mixture
 
+#this is the parent class for this file which handels all the process of Estimation.
 class local_estimate:
-    #well here instead of the local policy I am taking in data
-    #data dimension is 10X5
+    '''
+    Here the class the takes basic inputs as follows:
+        1. data: Here the data should be in the form x_t,u_t,x_{t+1} from the initial point till the (final point -1)
+        2. components: This should be a integer, which indicates the number gaussian mixiture models used in the system.
+        3. NoOfStates: This  input should be an inteeger which indicates the states of the system who's data is sent.
+        4. lam: This is by default 0, this is variable which is used in regularization.
+    '''
     def __init__(self,data,components,NoOfstates,lam = 0):
         self.lam = lam
         self.numberOfStates = NoOfstates
@@ -13,10 +20,22 @@ class local_estimate:
         self.components = components
         self.gmm_data = self.data
         self.means = None
-        self.covariances = None
+        self.covariances = NoneApplies
         self.NIW_id = 0
-                                                
-
+    '''
+    Note: 
+    The method "estimate" has fApplies
+    Inputs:
+        1. gmm_true: Which is bAppliesformed or not.
+        2. N: Default is 500, iAppliesen per iteration.
+    Outputs:
+    1. A,B,C from the system.
+    
+    Process:
+        Step 1: calls the GMM_method().
+        Step 2: Does the NIW posterior.
+        step 3: Does the post processing (Conditioning) and the regularization if required.
+    '''
     def estimate(self,gmm_true=True,N=500):
         self.gmm_true = gmm_true
         if self.gmm_true:
@@ -26,13 +45,36 @@ class local_estimate:
             return(A,B,C)
         else:
             return self.old()
-
+	'''
+    append_data method:
+    This is a utilitary method which can be called seperatly to append the data from the system.
+	inputs:
+		1. data: data that needs to be appended
+	outputs:
+		No ouputs to the main code but, appends the data from the function.
+	Process:
+		If there is data already, then the system will append the data or else the data will be created
+    '''
     def append_data(self,data):
         if self.means == None:
             self.data = data
         else:
             self.data = np.append(self.data,data,axis = 0)
         self.gmm_data = self.data
+	
+	'''
+	Internal method 'GMM_method':
+	inputs:
+		Nothing
+	
+	Outputs:
+		1. Returns the means and covariance of the maximum relavance (refer the documentation for the meaning of the relevance)
+
+	steps:
+		1. Calls the sklearn based gmm model which will create the joint prior distribution
+		2. Using the log_responsibility and mixing ratio function finding the relavance
+		3. Pick the maximum of the relevance of the system using the method.
+	'''
 
     def GMM_method(self):
         gmm = mixture.GaussianMixture(n_components = self.components , covariance_type = 'full')
@@ -55,6 +97,19 @@ class local_estimate:
         return (self.means[self.NIW_id,:],self.covariance[self.NIW_id,:,:])
         #here the r is the relevance of the size (1000,n_gaussian)
     
+	'''
+	Internal method 'NIW_distribution'
+	inputs:
+		X: means from GMM
+		Y: covariance from GMM
+		N: Data points for GMM entry
+	ouputs:
+		NIW means and covariance of the posterior prediction.
+	Steps:
+		Please refer the documentation for the steps followed in this procedure
+	'''
+
+
     def NIW_distribution(self,x,y,N):
         gmm_mean = x
         gmm_cov = y.reshape(self.N,self.N)
@@ -70,6 +125,13 @@ class local_estimate:
         #print('NIW mean',NIW_mean.shape)
         return(NIW_mean,NIW_cov)
 
+	'''
+	Internal method 'old'
+	Inputs:
+		1. data
+	Outputs:
+		regular mean and covariance
+	'''
 
     def old(self):
         self.means = np.mean(self.data,0)
@@ -77,6 +139,18 @@ class local_estimate:
             x = x.T
             self.covariances += np.dot((x-self.means),(x-self.means).T)
         self.covariances = self.covariances / (len(self.data) -1)
+
+	'''
+	Internal method Post_predict
+	Inputs:
+		1. NIW posterior mean
+		2. NIW posterior covariance
+	Ouputs:
+		A,B,C
+	steps:
+		1. Apply regularization
+		2. condition the probability of the system.
+	'''
 
     def Post_predict(self,x,y):
         cov_reg = self.lam * np.eye(self.numberOfStates+1)
