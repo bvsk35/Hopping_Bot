@@ -182,15 +182,45 @@ class CartPole(object):
         return xs, us
         
     '''
+    control_pattern: This modify the control actions based on the user input.
+                        1 - Normal: based on the correction/mixing parameter gamma generate control 
+                                (gamma controls how much noise we want).
+                        2 - MissingValue: based on the given percentage, set those many values to zero 
+                                (it is implicitly it uses "Normal" generated control is used). 
+                        3 - Shuffle: shuffles the entire "Normal" generated control sequence.
+                        4 - TimeDelay: takes the "Normal" generated control and shifts it by 1 index i.e. one unit time delay.
+                        5 - Extreme: sets gamma as zeros and generates control based on only noise.
+    '''
+    def control_pattern(self, u, pattern, mean, var, gamma, percent):
+        if pattern == 'Normal':
+            u = gamma * u + (1 - gamma) * np.random.normal(mean, var, u.shape)
+        elif pattern == 'MissingValue':
+            n = int(u.shape[0] * percent * 0.01)
+            index = np.random.randint(0, u.shape[0], n)
+            u = gamma * u + (1 - gamma) * np.random.normal(mean, var, u.shape)
+            u[index, :] = 0
+        elif pattern == 'Shuffle':
+            u = gamma * u + (1 - gamma) * np.random.normal(mean, var, u.shape)
+            np.random.shuffle(u)
+        elif pattern == 'TimeDelay':
+            u = gamma * u + (1 - gamma) * np.random.normal(mean, var, u.shape)
+            u = np.roll(u, 1, axis=0)
+            u[0, :] = 0
+        elif pattern == 'Extreme':
+            u = np.random.normal(mean, var, u.shape)
+        return u
+    
+    '''
     noise_traj_generator: In this method we generate trajectories based on some inital condition and noisy control action
                             which is generated from doing noise free ilQR roll-out and then adding noise to it.
                             Noise is added to the control action in special way. I use parameter gamma which indicates how much
                             percentage of original control action sequence must be mixed some percentage of the Gaussian noise.
                             Parameter: 1 - Mean (mean): Gaussian mean and 2 - Variance (var): Gaussian var.
                             Takes deaugmented states as input. Input will be the initial point and perfect control action.
+                            Also, based on the control pattern it again remodifies the enitre control action. Look above func.
     '''
-    def noise_traj_generator(self, x, u, mean, var, gamma):
-        u = gamma * u + (1 - gamma) * np.random.normal(mean, var, u.shape)
+    def noise_traj_generator(self, x, u, pattern, mean, var, gamma, percent):
+        u = self.control_pattern(u, pattern, mean, var, gamma, percent)
         x_new = self.augment_state(x)
         x_new = x_new.reshape(1,x_new.shape[0])
         for i in range(self.N):
@@ -230,15 +260,15 @@ class CartPole(object):
     
     '''
     gen_rollouts: Generates specified no. of rollouts and outputs states, control action and cost of all rollouts
-                    Means of the Gaussian noise will be taken as input from a Unif(0, mean_range) uniform distribution.
+                    Variance of the Gaussian noise will be taken as input from a Unif(0, var_range) uniform distribution.
     '''
-    def gen_rollouts(self, x_initial, x_goal, u, n_rollouts, mean_range, gamma):
+    def gen_rollouts(self, x_initial, x_goal, u, n_rollouts, pattern, var_range, gamma, percent=20):
         x_rollout = []
         u_rollout = []
         x_gmm = []
         cost = []
         for i in range(n_rollouts):
-            x_new, u_new = self.noise_traj_generator(x_initial, u, 0, np.random.uniform(0, mean_range, 1), gamma)
+            x_new, u_new = self.noise_traj_generator(x_initial, u, pattern, 0, np.random.uniform(0, var_range, 1), gamma, percent)
             x_new_temp = self.deaugment_state(x_new)
             cost.append(self.eval_traj_cost(x_new_temp, x_goal, u_new))
             x_rollout.append(x_new)
