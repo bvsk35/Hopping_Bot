@@ -131,7 +131,7 @@ class CartPole(object):
                         8 - Guess some control action
                         9 - Run iLQR
     '''
-    def run_IterLinQuadReg(self):
+    def run_IterLinQuadReg(self, us_init=None):
         x_input, u_input = self.state_inputs()
         x_dot_dot, theta_dot_dot, theta_prime = self.accel(x_input, u_input, self.xd)
         f = self.next_states(x_input, x_dot_dot, theta_dot_dot, theta_prime)
@@ -142,7 +142,8 @@ class CartPole(object):
         else:
             cost = QRCost(self.Q, self.R, Q_terminal=self.Q_terminal, x_goal=x_goal)
         x0 = self.augment_state(self.x0)
-        us_init = np.random.uniform(-1, 1, (self.N, dynamics.action_size))
+        if us_init == None:
+            us_init = np.random.uniform(-1, 1, (self.N, dynamics.action_size))
         ilqr = iLQR(dynamics, cost, self.N)
         xs, us = ilqr.fit(x0, us_init, on_iteration=self.on_iteration)
         return xs, us        
@@ -166,7 +167,7 @@ class CartPole(object):
     run_IterLinQuadReg_matrix: this method will run iLQR when we are given A, B, C state-space matrices
                         X(k+1) = A * [X(k) U(k)].T + B ---- Evolution of state over time is governed by this equation
     '''
-    def run_IterLinQuadReg_matrix(self, A, B, C):
+    def run_IterLinQuadReg_matrix(self, A, B, C, us_init=None):
         x_input, u_input = self.state_inputs()
         f = self.next_states_matrix(x_input, u_input, A, B, C)
         dynamics = AutoDiffDynamics(f, x_input, u_input)
@@ -176,7 +177,8 @@ class CartPole(object):
         else:
             cost = QRCost(self.Q, self.R, Q_terminal=self.Q_terminal, x_goal=x_goal)
         x0 = self.augment_state(self.x0)
-        us_init = np.random.uniform(-1, 1, (self.N, dynamics.action_size))
+        if us_init == None:
+            us_init = np.random.uniform(-1, 1, (self.N, dynamics.action_size))
         ilqr = iLQR(dynamics, cost, self.N)
         xs, us = ilqr.fit(x0, us_init, on_iteration=self.on_iteration)
         return xs, us
@@ -267,11 +269,12 @@ class CartPole(object):
         u_rollout = []
         x_gmm = []
         cost = []
+        local_policy = self.control_pattern(u, 'Normal', 0, np.random.uniform(0, 5, 1), 0.2, 20)
         for i in range(n_rollouts):
             if pattern_rand == True:
                 pattern_seq = np.array(['Normal', 'MissingValue', 'Shuffle', 'TimeDelay', 'Extreme'])
                 pattern = pattern_seq[np.random.randint(0, 5, 1)][0]
-            x_new, u_new = self.noise_traj_generator(x_initial, u, pattern, 0, np.random.uniform(0, var_range, 1), gamma, percent)
+            x_new, u_new = self.noise_traj_generator(x_initial, local_policy, pattern, 0, np.random.uniform(0, var_range, 1), gamma, percent)
             x_new_temp = self.deaugment_state(x_new)
             cost.append(self.eval_traj_cost(x_new_temp, x_goal, u_new))
             x_rollout.append(x_new)
@@ -283,4 +286,4 @@ class CartPole(object):
         u_rollout = np.array(u_rollout).reshape(len(u_rollout)*len(u_rollout[0]), len(u_rollout[0][0,:]))
         x_gmm = np.array(x_gmm).reshape(len(x_gmm)*len(x_gmm[0]), len(x_gmm[0][0,:]))
         cost = np.array(cost).reshape(n_rollouts, 1)
-        return x_rollout, u_rollout, x_gmm, cost
+        return x_rollout, u_rollout, local_policy, x_gmm, cost
