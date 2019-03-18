@@ -957,7 +957,7 @@ class QRCost_GPS(Cost):
         J = (L/self.eta) if terminal else (L/self.eta) - np.log(np.abs(u_old))
         return J
 
-    def l_x(self, x, i, terminal=False):
+    def l_x(self, x, us_init, cov_u, K, i, terminal=False):
         """Partial derivative of cost function with respect to x.
 
         Args:
@@ -977,10 +977,16 @@ class QRCost_GPS(Cost):
         Q_xu = self.Q_terminal[:self.state_size, self.state_size:] if terminal else self.Q[:self.state_size, self.state_size:]
         x_diff = x[:self.state_size] - self.x_goal[:self.state_size]
         u_diff = x[self.state_size:] - self.x_goal[self.state_size:]
-        J = 0.5 * (R_x + 2 * Q_xx.dot(x_diff) + 2 * u_diff.T.dot(Q_xu)) * 1/self.eta
+        delta = us_init - x[self.state_size:]
+        J1 = 0.5 * (R_x + 2 * Q_xx.dot(x_diff) + 2 * u_diff.T.dot(Q_xu)) * 1/self.eta
+        if terminal:
+            J2 = 0
+        else:
+            J2 = np.matmul(np.matmul(delta.T, np.linalg.inv(cov_u)), K)
+        J = J1 + J2
         return J
 
-    def l_u(self, x, i, terminal=False):
+    def l_u(self, x, us_init, cov_u, K, i, terminal=False):
         """Partial derivative of cost function with respect to u.
 
         Args:
@@ -1000,10 +1006,17 @@ class QRCost_GPS(Cost):
         Q_xu = self.Q_terminal[:self.state_size, self.state_size:] if terminal else self.Q[:self.state_size, self.state_size:]
         x_diff = x[:self.state_size] - self.x_goal[:self.state_size]
         u_diff = x[self.state_size:] - self.x_goal[self.state_size:]
-        J = 0.5 * (R_u + 2 * x_diff.T.dot(Q_xu) + 2 * u_diff.T.dot(Q_uu)) * 1/self.eta
+        delta = us_init - x[self.state_size:]
+        J1 = 0.5 * (R_u + 2 * x_diff.T.dot(Q_xu) + 2 * u_diff.T.dot(Q_uu)) * 1/self.eta
+        if terminal:
+            J2 = 0
+        else:
+            J2 = np.matmul(np.matmul(delta.T, np.linalg.inv(cov_u)), K)
+        J2 = -np.matmul(delta.T, np.linalg.inv(cov_u))
+        J = J1 + J2
         return J
 
-    def l_xx(self, x, i, terminal=False):
+    def l_xx(self, x, us_init, cov_u, K, i, terminal=False):
         """Second partial derivative of cost function with respect to x.
 
         Args:
@@ -1019,10 +1032,15 @@ class QRCost_GPS(Cost):
             [state_size, state_size].
         """
         Q_xx = self.Q_terminal[:self.state_size, :self.state_size] if terminal else self.Q[:self.state_size, :self.state_size]
-        J = Q_xx/self.eta
+        J1 = Q_xx/self.eta
+        if terminal:
+            J2 = 0
+        else:
+            J2 = np.matmul(-np.matmul(K, np.linalg.inv(cov_u)), K)
+        J = J1 + J2
         return J
 
-    def l_ux(self, x, i, terminal=False):
+    def l_ux(self, x, us_init, cov_u, K, i, terminal=False):
         """Second partial derivative of cost function with respect to u and x.
 
         Args:
@@ -1038,10 +1056,12 @@ class QRCost_GPS(Cost):
             [action_size, state_size].
         """
         Q_xu = self.Q_terminal[:self.state_size, self.state_size:] if terminal else self.Q[:self.state_size, self.state_size:]
-        J = Q_xu.T/self.eta
+        J1 = Q_xu.T/self.eta
+        J2 = np.matmul(K, np.linalg.inv(cov_u))
+        J = J1 + J2
         return J
 
-    def l_uu(self, x, i, terminal=False):
+    def l_uu(self, x, us_init, cov_u, K, i, terminal=False):
         """Second partial derivative of cost function with respect to u.
 
         Args:
@@ -1057,7 +1077,9 @@ class QRCost_GPS(Cost):
             [action_size, action_size].
         """
         Q_uu = self.Q_terminal[self.state_size:, self.state_size:] if terminal else self.Q[self.state_size:, self.state_size:]
-        J = Q_uu/self.eta
+        J1 = Q_uu/self.eta
+        J2 = -np.linalg.inv(cov_u)
+        J = J1 + J2
         return J
 
 class PathQRCost(Cost):

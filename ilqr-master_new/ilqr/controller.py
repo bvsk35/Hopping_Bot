@@ -115,12 +115,6 @@ class iLQR(BaseController):
         k = self._k
         K = self._K
 
-        ### Modified: us_init indicate local policy sent to the optimizer
-        # eta = (10 - 0.001) * np.random.ranf() + 0.001
-        # epsilon = (1 - 0.25) * np.random.ranf() + 0.25
-        self.cost.eta = 1
-        self.epsilon = 0.5
-
         changed = True
         converged = False
         for iteration in range(n_iterations):
@@ -442,7 +436,7 @@ iLQR_GPS: iLQR modified for GPS
 class iLQR_GPS(BaseController):
     """Finite Horizon Iterative Linear Quadratic Regulator."""
 
-    def __init__(self, dynamics_GPS, cost_GPS, N, max_reg=1e10, hessians=False, epsilon=1):
+    def __init__(self, dynamics_GPS, cost_GPS, N, A, B, C, max_reg=1e10, hessians=False, epsilon=1):
         """Constructs an iLQR solver.
 
         Args:
@@ -470,167 +464,74 @@ class iLQR_GPS(BaseController):
         self._delta_0 = 2.0
         self._delta = self._delta_0
 
-        self._k = np.zeros((N, dynamics_GPS.action_size))
-        self._K = np.zeros((N, dynamics_GPS.action_size, dynamics_GPS.state_size))
+        self._k = np.random.uniform(-0.1, 0.1, (N, dynamics_GPS.action_size))
+        self._K = 0.01 * np.random.normal(0, np.eye(dynamics_GPS.action_size, dynamics_GPS.state_size), 
+                                            (N, dynamics_GPS.action_size, dynamics_GPS.state_size))
+
+        cov_u = []            
+        temp = 0.01 * np.eye(dynamics_GPS.action_size)
+        cov_u.append(temp)
+        self.cov_u = np.array(cov_u*self.N)
         
         ### New params
         self.epsilon = epsilon
+        self.A = A
+        self.B = B
+        self.C = C
 
         super(iLQR_GPS, self).__init__()
 
-    ###### Additional Functions ######
-
     def generate_mean_cov(self, x, u, k, K, A, B, C, mean_old, cov_old, Q_uu):
         ### EQUATION 2.54, 2.55
-        temp = u + k + K.dot(mean_old - x)
-        temp1 = np.concatenate((mean_old, temp), axis=0)
-        mean_new = np.matmul(A, temp1.reshape(-1, 1)) + B
-        temp2 = np.matmul(cov_old, K.T)
-        temp3 = np.linalg.inv(Q_uu) + np.matmul(K, temp2)
-        temp4 = np.matmul(np.matmul(A, np.block([[cov_old, temp2], [temp2.T, temp3]])), A.T)
-        cov_new = temp4 + C
-        return mean_new, cov_new
+        mean_new = []
+        cov_new = []
+        for i in range(mean_old.shape[0]):
+            temp = u + k[i] + K[i].dot(mean_old[i] - x[i])
+            temp1 = np.concatenate((mean_old[i], temp), axis=0)
+            #not sure about the size of temp1
+            mean_new = np.matmul(A, temp1.reshape(-1, 1)) + B
+            temp2 = np.matmul(cov_old[i], K[i].T)
+            temp3 = np.linalg.inv(Q_uu[i]) + np.matmul(K[i], temp2)
+            temp4 = np.matmul(np.matmul(A, np.block([[cov_old[i], temp2], [temp2.T, temp3]])), A.T)
+            cov_new = temp4 + C
+        return np.array(mean_new), np.array(cov_new)
     
-    def cost_estimation(self, eta, mean, cov, u_current):
+    def cost_estimation(self, eta, mean, cov, us_init):
         ### EQUATION 2.51, 2.57
         self.cost_GPS.eta = eta
         state_size = self.dynamics_GPS.state_size
         mean_x = mean[:state_size, :]
         mean_u = mean[state_size:, :]
-        J_estimate = self._trajectory_cost_GPS(mean_x, mean_u) + np.trace(np.matmul(self.cost_GPS.Q, cov))-entropy(u_current)-self.epsilon
+        J_estimate_1 = self._trajectory_cost_GPS(mean_x, mean_u) 
+        J_estimate_2 = 0
+        for i in range(mean.shape[0]):
+            temp =  np.trace(np.matmul(self.cost_GPS.Q, cov[i]))
+            J_estimate_2 = J_estimate_2 + temp
+        J_estimate_3 = entropy(us_init) + self.epsilon
+        J_estimate = J_estimate_1 + J_estimate_2 - J_estimate_3
         return J_estimate
 
-    def eta_estimation(self, mean, cov, u_current):
+    def eta_estimation(self, mean, cov, us_init):
         ### Page 54, 55 eta = [0.001, 10]
-        eta_max = self.cost_estimation(0.001, mean, cov, u_current)
-        eta_min = self.cost_estimation(10, mean, cov, u_current)
+        eta_max = self.cost_estimation(0.001, mean, cov, us_init)
+        eta_min = self.cost_estimation(10, mean, cov, us_init)
         if eta_max*eta_min < 0:
-            eta = optimize.brentq(self.cost_estimation, 0.001, 10, args=(mean, cov, u_current))
+            eta = optimize.brentq(self.cost_estimation, 0.001, 10, args=(mean, cov, us_init))
         else:
             param_range = np.geomspace(0.001, 10, 30)
             loss = []
             for i in param_range:
-                temp = self.cost_estimation(i, mean, cov, u_current)
+                temp = self.cost_estimation(i, mean, cov, us_init)
                 loss.append(temp)
             opt_index = loss.index(min(loss))
             eta = param_range[opt_index]
         return eta
         
-    ###### Original Functions ######
-    def fit_GPS(self, x0, us_init, n_iterations=100, tol=1e-6, on_iteration=None):
-        """Computes the optimal controls.
-
-        Args:
-            x0: Initial state [state_size].
-            us_init: Initial control path [N, action_size].
-            n_iterations: Maximum number of interations. Default: 100.
-            tol: Tolerance. Default: 1e-6.
-            on_iteration: Callback at the end of each iteration with the
-                following signature:
-                (iteration_count, x, J_opt, accepted, converged) -> None
-                where:
-                    iteration_count: Current iteration count.
-                    xs: Current state path.
-                    us: Current action path.
-                    J_opt: Optimal cost-to-go.
-                    accepted: Whether this iteration yielded an accepted result.
-                    converged: Whether this iteration converged successfully.
-                Default: None.
-
-        Returns:
-            Tuple of
-                xs: optimal state path [N+1, state_size].
-                us: optimal control path [N, action_size].
-        """
-        # Determine state size and action size
-        # Reset regularization term.
-        self._mu = 1.0
-        self._delta = self._delta_0
-
-        # Backtracking line search candidates 0 < alpha <= 1.
-        # alphas = 1.1**(-np.arange(10)**2)
-
-        us = us_init.copy()
-
-        k = self._k
-        K = self._K
-
-        ### Modified: us_init indicate local policy sent to the optimizer
-        # eta = (10 - 0.001) * np.random.ranf() + 0.001
-        # epsilon = (1 - 0.25) * np.random.ranf() + 0.25
-        self.cost_GPS.eta = 1
-        self.epsilon = 0.5
-
-        converged = False
-        accepted = False
-
-        # Forward rollout only if it needs to be recomputed.
-        (xs, F_x, F_u, L, L_x, L_u, L_xx, L_ux, L_uu, F_xx, F_ux,
-        F_uu) = self._forward_rollout(x0, us, us_init)
-        J_opt = L.sum()
-
-        try:
-            # Backward pass.
-            k, K = self._backward_pass(F_x, F_u, L_x, L_u, L_xx, L_ux, L_uu,
-                                    F_xx, F_ux, F_uu)
-            # Backtracking line search.
-            xs_new, us_new = self._control(xs, us, k, K, alpha=1)
-            ### Modification
-            ### Estimation of epsilon outside iLQR; estimate_eta(us_new, us, epsilon)
-            ### Set the global eta to new value
-            self.cost_GPS.eta = 5
-            J_new = self._trajectory_cost(xs_new, us) ### Modified
-            if J_new < J_opt:
-                print('new trajectory cost:',J_new, 'optimal traj cost:',J_opt,J_new<J_opt)
-                if np.abs((J_opt - J_new) / J_opt) < tol:
-                    converged = True
-                J_opt = J_new
-                xs = xs_new
-                us = us_new
-
-                # Decrease regularization term.
-                self._delta = min(1.0, self._delta) / self._delta_0
-                self._mu *= self._delta
-                if self._mu <= self._mu_min:
-                    self._mu = 0.0
-
-                # Accept this.
-                accepted = True
-                # break
-        except np.linalg.LinAlgError as e:
-            # Quu was not positive-definite and this diverged.
-            # Try again with a higher regularization term.
-            warnings.warn(str(e))
-
-        if not accepted:
-            # Increase regularization term.
-            self._delta = max(1.0, self._delta) * self._delta_0
-            self._mu = max(self._mu_min, self._mu * self._delta)
-            if self._mu_max and self._mu >= self._mu_max:
-                warnings.warn("exceeded max regularization term")
-                # break
-
-        if on_iteration:
-            print('Iterations happening')
-            # on_iteration(iteration, xs, us, J_opt, accepted, converged)
-
-        if converged:
-            print('Converged')
-            # break
-
-        # Store fit parameters.
-        self._k = k
-        self._K = K
-        self._nominal_xs = xs
-        self._nominal_us = us
-
-        return xs, us
-
     def _control_GPS(self, xs, us, k, K, alpha=1.0):
         """Applies the controls for a given trajectory.
 
         Args:
-            xs: Nominal state path [N+1, state_size].
+            xs: Nominal state path [N+1, state_size + action_size].
             us: Nominal control path [N, action_size].
             k: Feedforward gains [N, action_size].
             K: Feedback gains [N, action_size, state_size].
@@ -638,7 +539,7 @@ class iLQR_GPS(BaseController):
 
         Returns:
             Tuple of
-                xs: state path [N+1, state_size].
+                xs: state path [N+1, state_size + action_size].
                 us: control path [N, action_size].
         """
         xs_new = np.zeros_like(xs)
@@ -648,18 +549,15 @@ class iLQR_GPS(BaseController):
         action_size = self.dynamics_GPS.action_size
 
         for i in range(self.N):
-            # Eq (12).
             # Applying alpha only on k[i] as in the paper for some reason
             # doesn't converge.
-            # us_new[i] = us[i] + alpha * (k[i] + K[i].dot(xs_new[i] - xs[i]))
             us_new[i] = us[i] + alpha * (k[i]) + K[i].dot(xs_new[i][:state_size] - xs[i][:state_size])
 
-            # Eq (8c).
             xs_new[i + 1][:state_size] = self.dynamics_GPS.f(xs_new[i][:state_size], us_new[i], i)
             xs_new[state_size:] = us_new
         return xs_new, us_new
 
-    def _trajectory_cost_GPS(self, xs, u_old):
+    def _trajectory_cost_GPS(self, xs, us_init):
         """Computes the given trajectory's cost.
 
         Args:
@@ -669,10 +567,10 @@ class iLQR_GPS(BaseController):
         Returns:
             Trajectory's total cost.
         """
-        J = map(lambda args: self.cost_GPS.l(*args), zip(xs[:-1], u_old, range(self.N)))
+        J = map(lambda args: self.cost_GPS.l(*args), zip(xs[:-1], us_init, range(self.N)))
         return sum(J) + self.cost_GPS.l(xs[-1], None, self.N, terminal=True)
 
-    def _forward_rollout_GPS(self, x0, us, local_policy):
+    def _forward_rollout_GPS(self, x0, us, us_init, cov_u, K):
         """Apply the forward dynamics to have a trajectory from the starting
         state x0 by applying the control path us.
 
@@ -746,11 +644,11 @@ class iLQR_GPS(BaseController):
             F_u[i] = F_linear[i][state_size:, :]
 
             L[i] = self.cost_GPS.l(x, local_policy[i], i, terminal=False)
-            L_x[i] = self.cost_GPS.l_x(x, i, terminal=False)
-            L_u[i] = self.cost_GPS.l_u(x, i, terminal=False)
-            L_xx[i] = self.cost_GPS.l_xx(x, i, terminal=False)
-            L_ux[i] = self.cost_GPS.l_ux(x, i, terminal=False)
-            L_uu[i] = self.cost_GPS.l_uu(x, i, terminal=False)
+            L_x[i] = self.cost_GPS.l_x(x, local_policy[i], cov_u[i], K[i], i, terminal=False)
+            L_u[i] = self.cost_GPS.l_u(x, local_policy[i], cov_u[i], K[i], i, terminal=False)
+            L_xx[i] = self.cost_GPS.l_xx(x, local_policy[i], cov_u[i], K[i], i, terminal=False)
+            L_ux[i] = self.cost_GPS.l_ux(x, local_policy[i], cov_u[i], K[i], i, terminal=False)
+            L_uu[i] = self.cost_GPS.l_uu(x, local_policy[i], cov_u[i], K[i], i, terminal=False)
 
             if self._use_hessians:
                 F_quad[i] = self.dynamics_GPS.f_quad_diff(x, i)
@@ -805,16 +703,19 @@ class iLQR_GPS(BaseController):
 
         k = np.empty_like(self._k)
         K = np.empty_like(self._K)
+        Q = []
 
         for i in range(self.N - 1, -1, -1):
             if self._use_hessians:
                 Q_x, Q_u, Q_xx, Q_ux, Q_uu = self._Q_GPS(
                     F_x[i], F_u[i], L_x[i], L_u[i], L_xx[i], L_ux[i], L_uu[i],
                     V_x, V_xx, F_xx[i], F_ux[i], F_uu[i])
+                Q.append(Q_uu)
             else:
                 Q_x, Q_u, Q_xx, Q_ux, Q_uu = self._Q_GPS(F_x[i], F_u[i], L_x[i],
                                                      L_u[i], L_xx[i], L_ux[i],
                                                      L_uu[i], V_x, V_xx)
+                Q.append(Q_uu)
 
             # Eq (6).
             k[i] = -np.linalg.solve(Q_uu, Q_u)
@@ -829,7 +730,7 @@ class iLQR_GPS(BaseController):
             V_xx += K[i].T.dot(Q_ux) + Q_ux.T.dot(K[i])
             V_xx = 0.5 * (V_xx + V_xx.T)  # To maintain symmetry.
 
-        return np.array(k), np.array(K)
+        return np.array(k), np.array(K), np.array(Q)
 
     def _Q_GPS(self,
            f_x,
@@ -889,6 +790,139 @@ class iLQR_GPS(BaseController):
             Q_uu += np.tensordot(V_x, f_uu, axes=1)
 
         return Q_x, Q_u, Q_xx, Q_ux, Q_uu
+
+    def fit_GPS(self, x0, us_init, us_local, n_iterations=100, tol=1e-6, cov_method='MEM', on_iteration=None):
+        """Computes the optimal controls.
+
+        Args:
+            x0: Initial state [state_size + action_size].
+            us_init: Initial control path, more precisely local policy [N, action_size].
+            n_iterations: Maximum number of interations. Default: 100.
+            tol: Tolerance. Default: 1e-6.
+            cov_method: Defines the way covariances should be calculated
+                MEM: Maximum Entropy Method. Cov = (Q_uu)^-1
+                FCM: Fixed Covariance Method. Cov = 0.01*eye(state_size + action_size, state_size + action_size)
+            on_iteration: Callback at the end of each iteration with the
+                following signature:
+                (iteration_count, x, J_opt, accepted, converged) -> None
+                where:
+                    iteration_count: Current iteration count.
+                    xs: Current state path.
+                    us: Current action path.
+                    J_opt: Optimal cost-to-go.
+                    accepted: Whether this iteration yielded an accepted result.
+                    converged: Whether this iteration converged successfully.
+                Default: None.
+
+        Returns:
+            Tuple of
+                xs: optimal state path [N+1, state_size].
+                us: optimal control path [N, action_size].
+
+        Note:
+            eta: Range of eta is [0.001, 10].
+            epsilon: Range of epsilon is [0.25, 1].
+            alpha: Backtracking line search parameter alpha is set to 1 always. If you want to the search then backtracking 
+                    line search candidates 0 < alpha <= 1. Code: alphas = 1.1**(-np.arange(10)**2)
+        """
+        # Determine state size and action size
+        # Reset regularization term.
+        self._mu = 1.0
+        self._delta = self._delta_0
+
+        # Make a copy of initial guess
+        us = us_local.copy()
+
+        # Control parameter
+        # k: Open loop controller gain matrix and 
+        # K: Closed loop feedback controller gain matrix
+        k = self._k
+        K = self._K
+
+        changed = True
+        converged = False
+        for iteration in range(n_iterations):
+            accepted = False
+
+            if iteration == 0:
+                # Set eta for the first iteration equal to one
+                self.cost_GPS.eta = 1.0
+                mean = []
+                cov = []
+                temp = np.matmul(self.A, x0) + self.B
+                temp1 = self.C
+                mean.append(temp)
+                cov.append(temp1)
+                mean = np.array(mean*self.N)
+                cov = np.array(cov*self.N)
+            else:
+                # Estimate the eta 
+                mean, cov = self.generate_mean_cov(xs[:self.dynamics_GPS.state_size, :], xs[self.dynamics_GPS.state_size:, :], k, K, self.A, 
+                                                        self.B, self.C, mean, cov, Q_uu)
+                self.cost_GPS.eta = self.eta_estimation(mean, cov, us_init)
+
+            # Forward rollout only if it needs to be recomputed.
+            if changed:
+                (xs, F_linear, F_quad, F_x, F_u, L, L_x, L_u, L_xx, L_ux, L_uu, F_xx, F_ux,
+                F_uu) = self._forward_rollout_GPS(x0, us, us_init, cov_u, K)
+                J_opt = L.sum()
+                changed = False
+
+            try:
+                # Backward pass.
+                k, K, Q_uu = self._backward_pass_GPS(F_x, F_u, L_x, L_u, L_xx, L_ux, L_uu,
+                                        F_xx, F_ux, F_uu)
+                xs_new, us_new = self._control_GPS(xs, us, k, K, alpha=1.0)
+                J_new = self._trajectory_cost_GPS(xs_new, us)
+                if J_new < J_opt:
+                    if np.abs((J_opt - J_new) / J_opt) < tol:
+                        converged = True
+                    J_opt = J_new
+                    xs = xs_new
+                    us = us_new
+                    cov_u = []
+                    if cov_method == 'MEM':
+                        for i in range(self.N):
+                            cov_u.append(np.linalg.inv(Q_uu[i]))
+                            cov_u = np.array(cov_u)
+                    elif cov_method == 'FCM':
+                            temp = 0.01 * np.eye(self.dynamics_GPS.action_size)
+                            cov_u.append(temp)
+                            cov_u = np.array(cov_u*self.N)
+                    changed = True
+                    # Decrease regularization term.
+                    self._delta = min(1.0, self._delta) / self._delta_0
+                    self._mu *= self._delta
+                    if self._mu <= self._mu_min:
+                        self._mu = 0.0
+                    # Accept this.
+                    accepted = True
+            except np.linalg.LinAlgError as e:
+                # Quu was not positive-definite and this diverged.
+                # Try again with a higher regularization term.
+                warnings.warn(str(e))
+
+            if not accepted:
+                # Increase regularization term.
+                self._delta = max(1.0, self._delta) * self._delta_0
+                self._mu = max(self._mu_min, self._mu * self._delta)
+                if self._mu_max and self._mu >= self._mu_max:
+                    warnings.warn("exceeded max regularization term")
+                    break
+
+            if on_iteration:
+                on_iteration(iteration, xs, us, J_opt, accepted, converged)
+
+            if converged:
+                break
+
+        # Store fit parameters.
+        self._k = k
+        self._K = K
+        self._nominal_xs = xs
+        self._nominal_us = us
+        
+        return xs, us, cov_u
 
 class RecedingHorizonController(object):
 

@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC  -std=c++11 -O3 -DNDEBUG  -shared  -o rbdl.so CMakeFiles/rbdl-python.dir/rbdl-python.cxx.o -Wl,-rpath,/home/rrl/hoppingbot/Hoppingbot/rbdl/build: -lpython3.6m ../librbdl.so.2.6.0 
