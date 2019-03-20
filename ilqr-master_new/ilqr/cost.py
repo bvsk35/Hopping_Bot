@@ -897,7 +897,7 @@ class QRCost_GPS(Cost):
         Args:
             State: [X(t) U(t)].T
             Q: Quadratic state cost matrix [state_size + action_size, state_size + action_size].
-            R: Quadratic control cost matrix [state_size + action_size, state_size + action_size].
+            R: Quadratic control cost matrix [state_size + action_size, 1].
             Q_terminal: Terminal quadratic state cost matrix
                 [state_size + action_size, state_size + action_size].
             x_goal: Goal state [state_size zeros(action_size)].
@@ -917,7 +917,7 @@ class QRCost_GPS(Cost):
 
         assert self.Q.shape == self.Q_terminal.shape, "Q & Q_terminal mismatch"
         assert self.Q.shape[0] == self.Q.shape[1], "Q must be square"
-        assert self.R.shape[0] == self.R.shape[1], "R must be square"
+        # assert self.R.shape[0] == self.R.shape[1], "R must be square"
         assert self.Q.shape[0] == self.x_goal.shape[0], "Q & x_goal mismatch"
 
         # Precompute some common constants.
@@ -932,7 +932,7 @@ class QRCost_GPS(Cost):
         
         super(QRCost_GPS, self).__init__()
 
-    def l(self, x, u_old, i, terminal=False):
+    def l(self, x, x_old, u_old, k, K, cov_u, i, terminal=False):
         ###### Modified based on equation 2.51######
         """Instantaneous cost function.
 
@@ -954,10 +954,40 @@ class QRCost_GPS(Cost):
             return squared_cost
         linear_cost = x.T.dot(R)
         L = 0.5 * (squared_cost + linear_cost)
-        J = (L/self.eta) if terminal else (L/self.eta) - np.log(np.abs(u_old))
+
+        mean_u = u_old + k + np.matmul(K, (x[:self.state_size, :] - x_old)) 
+        temp = x[self.state_size:, :] - mean_u
+        log_term1 = 0.5 * (np.matmul(np.matmul(temp.T, np.linalg.inv(cov_u)), temp))
+        log_term2 = np.log(np.sqrt((2 * np.pi)**self.action_size * np.linalg.det(cov_u)))
+
+        J = (L/self.eta) if terminal else (L/self.eta) - log_term1 - log_term2
         return J
 
-    def l_x(self, x, us_init, cov_u, K, i, terminal=False):
+    def l_estimate(self, x, i, terminal=False):
+        ###### Modified based on equation 2.51######
+        """Instantaneous cost function.
+
+        Args:
+            x: Current state [state_size; action_size].
+            u_old: Old control [action_size]
+            i: Current time step.
+            terminal: Compute terminal cost. Default: False.
+
+        Returns:
+            Instantaneous cost (scalar).
+        """
+        Q = self.Q_terminal if terminal else self.Q
+        R = self.R
+        x_diff = x - self.x_goal.reshape(x.shape)
+        squared_cost = x_diff.T.dot(Q).dot(x_diff)
+
+        if terminal:
+            return squared_cost
+        linear_cost = x.T.dot(R)
+        J = 0.5 * (squared_cost + linear_cost)
+        return J
+
+    def l_x(self, x, x_old, u_old, k, K, cov_u, i, terminal=False): 
         """Partial derivative of cost function with respect to x.
 
         Args:
@@ -977,16 +1007,21 @@ class QRCost_GPS(Cost):
         Q_xu = self.Q_terminal[:self.state_size, self.state_size:] if terminal else self.Q[:self.state_size, self.state_size:]
         x_diff = x[:self.state_size] - self.x_goal[:self.state_size]
         u_diff = x[self.state_size:] - self.x_goal[self.state_size:]
-        delta = us_init - x[self.state_size:]
-        J1 = 0.5 * (R_x + 2 * Q_xx.dot(x_diff) + 2 * u_diff.T.dot(Q_xu)) * 1/self.eta
+        x_diff = x_diff.reshape(-1, 1)
+        u_diff = u_diff.reshape(-1, 1)
+        J1 = 0.5 * (R_x + 2 * Q_xx.dot(x_diff) + 2 * Q_xu.dot(u_diff)) * 1/self.eta
         if terminal:
             J2 = 0
+            J = J1 + J2
+            return J[:, 0]
         else:
-            J2 = np.matmul(np.matmul(delta.T, np.linalg.inv(cov_u)), K)
-        J = J1 + J2
-        return J
+            mean_u = u_old + k + np.matmul(K, (x[:self.state_size, :] - x_old)) 
+            temp = x[self.state_size:, :] - mean_u
+            J2 = np.matmul(np.matmul(temp.T, np.linalg.inv(cov_u)), K)
+            J = J1 + J2.T
+            return J[:, 0]
 
-    def l_u(self, x, us_init, cov_u, K, i, terminal=False):
+    def l_u(self, x, x_old, u_old, k, K, cov_u, i, terminal=False):
         """Partial derivative of cost function with respect to u.
 
         Args:
@@ -1006,17 +1041,17 @@ class QRCost_GPS(Cost):
         Q_xu = self.Q_terminal[:self.state_size, self.state_size:] if terminal else self.Q[:self.state_size, self.state_size:]
         x_diff = x[:self.state_size] - self.x_goal[:self.state_size]
         u_diff = x[self.state_size:] - self.x_goal[self.state_size:]
-        delta = us_init - x[self.state_size:]
         J1 = 0.5 * (R_u + 2 * x_diff.T.dot(Q_xu) + 2 * u_diff.T.dot(Q_uu)) * 1/self.eta
         if terminal:
             J2 = 0
         else:
-            J2 = np.matmul(np.matmul(delta.T, np.linalg.inv(cov_u)), K)
-        J2 = -np.matmul(delta.T, np.linalg.inv(cov_u))
+            mean_u = u_old + k + np.matmul(K, (x[:self.state_size, :] - x_old)) 
+            temp = x[self.state_size:, :] - mean_u
+            J2 = -np.matmul(temp.T, np.linalg.inv(cov_u))
         J = J1 + J2
         return J
 
-    def l_xx(self, x, us_init, cov_u, K, i, terminal=False):
+    def l_xx(self, x, x_old, u_old, k, K, cov_u, i, terminal=False):
         """Second partial derivative of cost function with respect to x.
 
         Args:
@@ -1036,11 +1071,11 @@ class QRCost_GPS(Cost):
         if terminal:
             J2 = 0
         else:
-            J2 = np.matmul(-np.matmul(K, np.linalg.inv(cov_u)), K)
+            J2 = np.matmul(-np.matmul(K.T, np.linalg.inv(cov_u)), K)
         J = J1 + J2
         return J
 
-    def l_ux(self, x, us_init, cov_u, K, i, terminal=False):
+    def l_ux(self, x, x_old, u_old, k, K, cov_u, i, terminal=False):
         """Second partial derivative of cost function with respect to u and x.
 
         Args:
@@ -1057,11 +1092,11 @@ class QRCost_GPS(Cost):
         """
         Q_xu = self.Q_terminal[:self.state_size, self.state_size:] if terminal else self.Q[:self.state_size, self.state_size:]
         J1 = Q_xu.T/self.eta
-        J2 = np.matmul(K, np.linalg.inv(cov_u))
+        J2 = np.matmul(K.T, np.linalg.inv(cov_u)).T
         J = J1 + J2
         return J
 
-    def l_uu(self, x, us_init, cov_u, K, i, terminal=False):
+    def l_uu(self, x, x_old, u_old, k, K, cov_u, i, terminal=False):
         """Second partial derivative of cost function with respect to u.
 
         Args:

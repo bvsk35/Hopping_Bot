@@ -5,7 +5,7 @@ import theano.tensor as T
 from ilqr.controller import iLQR_GPS
 from ilqr.cost import QRCost_GPS
 from ilqr.dynamics import constrain
-from ilqr.dynamics import AutoDiffDynamics_GPS
+from ilqr.dynamics import AutoDiffDynamics
 
 class CartPole_GPS(object):
     '''
@@ -105,7 +105,7 @@ class CartPole_GPS(object):
             X[1] + lin_acc * self.dt,
             T.sin(next_theta),
             T.cos(next_theta),
-            X[4] + ang_acc * self.dt,
+            X[4] + ang_acc * self.dt
         ])
         return f
     
@@ -113,11 +113,11 @@ class CartPole_GPS(object):
     on_iteration: this method will help print useful information that is required so that we can keep track
                     about what is happening.
     '''
-    def on_iteration(self, iteration_count, xs, us, J_opt, accepted, converged):
+    def on_iteration(self, iteration_count, xs, us, J_opt, accepted, converged, eta):
         self.J_hist.append(J_opt)
         info = "converged" if converged else ("accepted" if accepted else "failed")
         final_state = self.deaugment_state(xs[-1])
-        print("iteration", iteration_count, info, J_opt, final_state)
+        print("iteration", iteration_count, info, J_opt, final_state, ' Eta ', eta)
     
     '''
     run_IterLinQuadReg: this method is the main function which will run the iLQR on the Cart Pole problem. Steps that are happening
@@ -131,18 +131,18 @@ class CartPole_GPS(object):
                         8 - Guess some control action
                         9 - Run iLQR
     '''
-    def run_IterLinQuadReg(self, us_local, A, B, C, epsilon):
+    def run_IterLinQuadReg(self, us_init, A, B, C, epsilon):
         x_input = self.state_inputs()
         x_dot_dot, theta_dot_dot, theta_prime = self.accel(x_input, self.xd)
         f = self.next_states(x_input, x_dot_dot, theta_dot_dot, theta_prime)
-        dynamics = AutoDiffDynamics_GPS(f, x_input, state_size=5, action_size=1)
+        dynamics = AutoDiffDynamics(f, x_input[:5], [x_input[5]])
         x_goal = self.augment_state(self.x_goal)
         if self.Q_terminal.all() == None:
             cost = QRCost_GPS(self.Q, self.R, state_size=5, action_size=1)
         else:
             cost = QRCost_GPS(self.Q, self.R, Q_terminal=self.Q_terminal, x_goal=x_goal, state_size=5, action_size=1)
         x0 = self.augment_state(self.x0)
-        us_init = np.random.uniform(-1, 1, (self.N, dynamics.action_size))
+        us_local = np.random.uniform(-1, 1, (self.N, dynamics.action_size))
         ilqr = iLQR_GPS(dynamics, cost, self.N, A, B, C)
         xs, mean_us, cov_us = ilqr.fit_GPS(x0, us_init, us_local, cov_method='MEM', on_iteration=self.on_iteration)
         return xs, mean_us, cov_us        
