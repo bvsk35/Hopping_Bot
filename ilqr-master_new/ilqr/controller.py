@@ -487,7 +487,7 @@ class iLQR_GPS(BaseController):
         cov_xu = []
         mean = [mean_old[0]]
         cov = [cov_old[0]]
-        for i in range(mean_old.shape[0]-1):
+        for i in range(self.N):
             temp = u[i][:, np.newaxis] + k[i][:, np.newaxis] + K[i].dot(mean[-1] - x[i][:, np.newaxis])
             temp1 = np.concatenate((mean[-1], temp), axis=0)
             mean_new = np.matmul(A, temp1) + B
@@ -501,39 +501,31 @@ class iLQR_GPS(BaseController):
             cov_xu.append(np.block([[cov_old[i], temp2], [temp2.T, temp3]]))
         return np.array(mean_xu), np.array(cov_xu), np.array(mean), np.array(cov)
     
-    def cost_estimation(self, eta, mean_xu, cov_xu, us, us_init): self, x, x_old, u_old, k, K, cov_u,
-        ### EQUATION 2.51, 2.57
-        self.cost_GPS.eta = eta
-        J_estimate_1 = self._trajectory_cost_estimate(mean_xu, us) 
+    def cost_estimation(self, eta, mean_xu, cov_xu, us, us_old):
+        ### EQUATION 2.50 to 2.57
+        J_estimate_1 = self._trajectory_cost_estimate(mean_xu) 
         J_estimate_2 = 0
         for i in range(mean_xu.shape[0]):
-            mean_u = u_old + k + np.matmul(K, (x[:self.state_size, :] - x_old)) 
-            temp = x[self.state_size:, :] - mean_u
-            log_term1 = 0.5 * (np.matmul(np.matmul(temp.T, np.linalg.inv(cov_u)), temp))
-            log_term2 = np.log(np.sqrt((2 * np.pi)**self.action_size * np.linalg.det(cov_u)))
-
-        J_estimate_3
-        for i in range(mean_xu.shape[0]):
             temp =  np.trace(np.matmul(self.cost_GPS.Q, cov_xu[i]))
-            J_estimate_3 = J_estimate_3 + temp
-        J_estimate_4 = entropy(np.abs(us_init)) + self.epsilon
-        J_estimate = J_estimate_1/eta + J_estimate_2/eta - J_estimate_4[0]
+            J_estimate_2 = J_estimate_2 + temp
+        J_estimate_3 = np.sum(entropy(np.abs(us), np.abs(us_old))) + self.epsilon
+        J_estimate = J_estimate_1/eta + J_estimate_2/eta - eta * J_estimate_3
         return J_estimate
 
-    def eta_estimation(self, mean_xu, cov_xu, us, us_init): 
+    def eta_estimation(self, mean_xu, cov_xu, us, us_old): 
         ### Page 54, 55 eta = [0.001, 10]
-        eta_max = self.cost_estimation(0.001, mean_xu, cov_xu, us, us_init)
-        eta_min = self.cost_estimation(10, mean_xu, cov_xu, us, us_init)
+        eta_max = self.cost_estimation(0.001, mean_xu, cov_xu, us, us_old)
+        eta_min = self.cost_estimation(10, mean_xu, cov_xu, us, us_old)
         if eta_max*eta_min < 0:
             print('Doing Brentq')
-            eta = optimize.brentq(self.cost_estimation, 0.001, 10, args=(mean_xu, cov_xu, us, us_init))
+            eta = optimize.brentq(self.cost_estimation, 0.001, 10, args=(mean_xu, cov_xu, us, us_old))
             print('New eta ',eta)
         else:
             print('Doing Log search')
             param_range = np.geomspace(0.001, 10, 30)
             loss = []
             for i in param_range:
-                temp = self.cost_estimation(i, mean_xu, cov_xu, us, us_init)
+                temp = self.cost_estimation(i, mean_xu, cov_xu, us, us_old)
                 loss.append(temp)
             opt_index = loss.index(min(loss))
             eta = param_range[opt_index]
@@ -571,7 +563,7 @@ class iLQR_GPS(BaseController):
             xs_new[state_size:] = us_new[i]
         return xs_new, us_new
 
-    def _trajectory_cost_GPS(self, xs, us_local):
+    def _trajectory_cost_GPS(self, x, x_old, u_old, k, K, cov_u):
         """Computes the given trajectory's cost.
 
         Args:
@@ -581,10 +573,10 @@ class iLQR_GPS(BaseController):
         Returns:
             Trajectory's total cost.
         """
-        J = map(lambda args: self.cost_GPS.l(*args), zip(xs[:-1], us_local, range(self.N)))
-        return sum(J) + self.cost_GPS.l(xs[-1], None, self.N, terminal=True)
+        J = map(lambda args: self.cost_GPS.l(*args), zip(x, x_old, u_old, k, K, cov_u, range(self.N)))
+        return sum(J) + self.cost_GPS.l(x[-1], None, None, None, None, None, self.N, terminal=True)
 
-    def _trajectory_cost_estimate(self, xs, us_local):
+    def _trajectory_cost_estimate(self, xs):
         """Computes the given trajectory's cost.
 
         Args:
@@ -594,8 +586,8 @@ class iLQR_GPS(BaseController):
         Returns:
             Trajectory's total cost.
         """
-        J = map(lambda args: self.cost_GPS.l_deaug(*args), zip(xs[:-1], us_local, range(self.N)))
-        return sum(J) + self.cost_GPS.l_deaug(xs[-1], us_local, self.N, terminal=True)
+        J = map(lambda args: self.cost_GPS.l_estimate(*args), zip(xs[:-1], range(self.N)))
+        return sum(J) + self.cost_GPS.l_estimate(xs[-1], self.N, terminal=True)
 
     def _forward_rollout_GPS(self, x0, x_old, us_current, us_old, k, K, cov_u):
         """Apply the forward dynamics to have a trajectory from the starting
@@ -657,7 +649,7 @@ class iLQR_GPS(BaseController):
 
         xs[0] = x0
 
-        for i in range(N):
+        for i in range(self.N):
             xs[i, state_size:] = us_current[i]
             x = xs[i]
 
@@ -665,17 +657,17 @@ class iLQR_GPS(BaseController):
             F_x[i] = self.dynamics.f_x(x[:state_size], x[state_size:], i)
             F_u[i] = self.dynamics.f_u(x[:state_size], x[state_size:], i)
 
-            L[i] = np.asarray(self.cost_GPS.l(x, x_old[i, :state_size, :], us_old[i], k[i], K[i], cov_u[i], i, terminal=False))
-            L_x[i] = self.cost_GPS.l_x(x, x_old[i, :state_size, :], us_old[i], k[i], K[i], cov_u[i], i, terminal=False)
-            L_u[i] = self.cost_GPS.l_u(x, x_old[i, :state_size, :], us_old[i], k[i], K[i], cov_u[i], i, terminal=False)
-            L_xx[i] = self.cost_GPS.l_xx(x, x_old[i, :state_size, :], us_old[i], k[i], K[i], cov_u[i], i, terminal=False)
-            L_ux[i] = self.cost_GPS.l_ux(x, x_old[i, :state_size, :], us_old[i], k[i], K[i], cov_u[i], i, terminal=False)
-            L_uu[i] = self.cost_GPS.l_uu(x, x_old[i, :state_size, :], us_old[i], k[i], K[i], cov_u[i], i, terminal=False)
+            L[i] = np.asarray(self.cost_GPS.l(x, x_old[i, :state_size], us_old[i], k[i], K[i], cov_u[i], i, terminal=False))
+            L_x[i] = self.cost_GPS.l_x(x, x_old[i, :state_size], us_old[i], k[i], K[i], cov_u[i], i, terminal=False)
+            L_u[i] = self.cost_GPS.l_u(x, x_old[i, :state_size], us_old[i], k[i], K[i], cov_u[i], i, terminal=False)
+            L_xx[i] = self.cost_GPS.l_xx(x, x_old[i, :state_size], us_old[i], k[i], K[i], cov_u[i], i, terminal=False)
+            L_ux[i] = self.cost_GPS.l_ux(x, x_old[i, :state_size], us_old[i], k[i], K[i], cov_u[i], i, terminal=False)
+            L_uu[i] = self.cost_GPS.l_uu(x, x_old[i, :state_size], us_old[i], k[i], K[i], cov_u[i], i, terminal=False)
 
             if self._use_hessians:
-                F_xx[i] = self.dynamics.f_xx(x[:state_size], x[state_size:], i)
-                F_ux[i] = self.dynamics.f_ux(x[:state_size], x[state_size:], i)
-                F_uu[i] = self.dynamics.f_uu(x[:state_size], x[state_size:], i)
+                F_xx[i] = self.dynamics.f_xx(x[i, :state_size], x[i, state_size:], i)
+                F_ux[i] = self.dynamics.f_ux(x[i, :state_size], x[i, state_size:], i)
+                F_uu[i] = self.dynamics.f_uu(x[i, :state_size], x[i, state_size:], i)
 
         x = xs[-1]
         L[-1] = self.cost_GPS.l(x, None, None, None, None, None, N, terminal=True)
@@ -868,7 +860,7 @@ class iLQR_GPS(BaseController):
 
             if iteration == 0:
                 # Set eta for the first iteration equal to one
-                self.cost_GPS.eta = 1.0
+                self.cost_GPS.eta = 10.0
                 mean = []
                 cov = []
                 temp = np.matmul(self.A, x0[:, np.newaxis]) + self.B
@@ -886,7 +878,7 @@ class iLQR_GPS(BaseController):
             # Forward rollout only if it needs to be recomputed.
             if changed:
                 (xs, F_x, F_u, L, L_x, L_u, L_xx, L_ux, L_uu, F_xx, F_ux,
-                F_uu) = self._forward_rollout_GPS(x0, xs, xs[:, self.dynamics.state_size:, :], us, k, K, self.cov_u)
+                F_uu) = self._forward_rollout_GPS(x0, xs, xs[:-1, self.dynamics.state_size:], us, k, K, self.cov_u)
                 J_opt = L.sum()
                 changed = False
 
@@ -896,13 +888,13 @@ class iLQR_GPS(BaseController):
                                         F_xx, F_ux, F_uu)
 
                 xs_new, us_new = self._control_GPS(xs, us, k, K, alpha=1.0)
-                J_new = self._trajectory_cost_GPS(xs_new, us)
+                J_new = self._trajectory_cost_GPS(xs_new, xs, us, k, K, self.cov_u)
                 if J_new < J_opt:
                     if np.abs((J_opt - J_new) / J_opt) < tol:
                         converged = True
                     else:
-                        mean_xu, cov_xu, mean, cov = self.generate_mean_cov(xs[:, :self.dynamics.state_size], xs[:, self.dynamics.state_size:], 
-                                                                                k, K, self.A, self.B, self.C, mean, cov, Q_uu)
+                        mean_xu, cov_xu, mean, cov = self.generate_mean_cov(xs[:, :self.dynamics.state_size], xs[:-1, self.dynamics.state_size:], 
+                                                                                        k, K, self.A, self.B, self.C, mean, cov, Q_uu)
                         self.cost_GPS.eta = self.eta_estimation(mean_xu, cov_xu, us, us_new)
                         J_opt = J_new
                         xs = xs_new

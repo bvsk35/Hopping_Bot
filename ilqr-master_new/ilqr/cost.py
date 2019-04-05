@@ -955,8 +955,8 @@ class QRCost_GPS(Cost):
         linear_cost = x.T.dot(R)
         L = 0.5 * (squared_cost + linear_cost)
 
-        mean_u = u_old + k + np.matmul(K, (x[:self.state_size, :] - x_old)) 
-        temp = x[self.state_size:, :] - mean_u
+        mean_u = u_old + k + np.matmul(K, (x[:self.state_size] - x_old[:self.state_size])) 
+        temp = x[self.state_size:] - mean_u
         log_term1 = 0.5 * (np.matmul(np.matmul(temp.T, np.linalg.inv(cov_u)), temp))
         log_term2 = np.log(np.sqrt((2 * np.pi)**self.action_size * np.linalg.det(cov_u)))
 
@@ -1015,8 +1015,8 @@ class QRCost_GPS(Cost):
             J = J1 + J2
             return J[:, 0]
         else:
-            mean_u = u_old + k + np.matmul(K, (x[:self.state_size, :] - x_old)) 
-            temp = x[self.state_size:, :] - mean_u
+            mean_u = u_old + k + np.matmul(K, (x[:self.state_size] - x_old[:self.state_size])) 
+            temp = x[self.state_size:] - mean_u[:, np.newaxis]
             J2 = np.matmul(np.matmul(temp.T, np.linalg.inv(cov_u)), K)
             J = J1 + J2.T
             return J[:, 0]
@@ -1045,8 +1045,8 @@ class QRCost_GPS(Cost):
         if terminal:
             J2 = 0
         else:
-            mean_u = u_old + k + np.matmul(K, (x[:self.state_size, :] - x_old)) 
-            temp = x[self.state_size:, :] - mean_u
+            mean_u = u_old + k + np.matmul(K, (x[:self.state_size] - x_old[:self.state_size])) 
+            temp = x[self.state_size:] - mean_u[:, np.newaxis]
             J2 = -np.matmul(temp.T, np.linalg.inv(cov_u))
         J = J1 + J2
         return J
