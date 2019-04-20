@@ -290,7 +290,7 @@ class Prior_Dynamics_GMM(object):
 
         # Choose number of clusters.
         K = int(max(2, min(self._max_clusters,
-                           np.floor(float(N * T) / self._min_samp))))
+                           np.floor(float(N * T) / self._min_samples_per_cluster))))
 
         # Update GMM.
         self.gmm.update(xux, K)
