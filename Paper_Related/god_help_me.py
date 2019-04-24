@@ -11,9 +11,6 @@ from ilqr.dynamics import constrain
 from ilqr.dynamics import AutoDiffDynamics
 
 
-
-
-
 def accel(X, u, m=1, M=5, L=2, g=9.80665, d=1):
     temp = (u[0] + m * L * X[4]**2 * X[2])/(M + m)
     num = g * X[2] - X[3] * temp
