@@ -57,7 +57,6 @@ class Gaussian_Mixture_Model(object):
         # Set hyperparameters.
         m = self.N
         n0 = m - 2 - mu0.shape[0]
-        print(mu0,mu0.shape,'mu0 in the inference')
 
         # Normalize.
         m = float(m) / self.N
@@ -376,8 +375,6 @@ class Estimated_Dynamics_Prior(object):
             Ys = np.c_[X[:, t, :], U[:, t, :], X[:, t+1, :]]
             # Obtain Normal-inverse-Wishart prior.
             mu0, Phi, mm, n0 = self.prior.eval(dX, dU, Ys)
-            print(mu0.shape,'this is the shape of the mu0 in fit')
-            print(Phi.shape,'this is the shape of the mu0 in fit')
             sig_reg = np.zeros((dX+dU+dX, dX+dU+dX))
             sig_reg[it, it] = 1e-6
             Fm, fv, dyn_covar = self.gauss_fit_joint_prior(Ys, mu0, Phi, mm, n0, dwts, dX+dU, dX, sig_reg)
