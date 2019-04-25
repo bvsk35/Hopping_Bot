@@ -2,7 +2,7 @@
 from mujoco_py import load_model_from_path, MjSim, MjViewer
 import math 
 import os
-Model = "hoppingbot.xml"
+Model = "cartpole.xml"
 model_loaded = load_model_from_path(Model)
 sim = MjSim(model_loaded)
 viewer = MjViewer(sim)
