@@ -135,7 +135,7 @@ class CartPole(object):
         x_input, u_input = self.state_inputs()
         x_dot_dot, theta_dot_dot, theta_prime = self.accel(x_input, u_input, self.xd)
         f = self.next_states(x_input, x_dot_dot, theta_dot_dot, theta_prime)
-        dynamics = AutoDiffDynamics(f, x_input, u_input)
+        dynamics = AutoDiffDynamics(f, x_input, u_input,hessians=True)
         x_goal = self.augment_state(self.x_goal)
         if self.Q_terminal.all() == None:
             cost = QRCost(self.Q, self.R)
@@ -144,9 +144,10 @@ class CartPole(object):
         x0 = self.augment_state(self.x0)
         if us_init == None:
             us_init = np.random.uniform(-1, 1, (self.N, dynamics.action_size))
-        ilqr = iLQR(dynamics, cost, self.N)
+        ilqr = iLQR(dynamics, cost, self.N,hessians=True)
         xs, us = ilqr.fit(x0, us_init, on_iteration=self.on_iteration)
-        return xs, us        
+        # print(ilqr._K,'this is capital K')
+        return xs, us, ilqr._k, ilqr._K
    
     '''
     next_states_matrix: this method will work same as next_state except that it will take A, B state-space matrices as input
@@ -278,12 +279,16 @@ class CartPole(object):
             x_new_temp = self.deaugment_state(x_new)
             cost.append(self.eval_traj_cost(x_new_temp, x_goal, u_new))
             x_rollout.append(x_new)
+            u_new = np.append(u_new, [[0]], axis=0)
             u_rollout.append(u_new)
-            temp = np.append(x_new[:-1,:], u_new, axis=1)
-            temp = np.append(temp, x_new[1:,:], axis=1)
-            x_gmm.append(temp)
-        x_rollout = np.array(x_rollout).reshape(len(x_rollout)*len(x_rollout[0]), len(x_rollout[0][0,:]))
-        u_rollout = np.array(u_rollout).reshape(len(u_rollout)*len(u_rollout[0]), len(u_rollout[0][0,:]))
-        x_gmm = np.array(x_gmm).reshape(len(x_gmm)*len(x_gmm[0]), len(x_gmm[0][0,:]))
+#             temp = np.append(x_new[:-1,:], u_new, axis=1)
+#             temp = np.append(temp, x_new[1:,:], axis=1)
+#             x_gmm.append(temp)
+#         x_rollout = np.array(x_rollout).reshape(len(x_rollout)*len(x_rollout[0]), len(x_rollout[0][0,:]))
+#         u_rollout = np.array(u_rollout).reshape(len(u_rollout)*len(u_rollout[0]), len(u_rollout[0][0,:]))
+        x_rollout = np.array(x_rollout)
+        u_rollout = np.array(u_rollout)
+#         x_gmm = np.array(x_gmm).reshape(len(x_gmm)*len(x_gmm[0]), len(x_gmm[0][0,:]))
         cost = np.array(cost).reshape(n_rollouts, 1)
-        return x_rollout, u_rollout, local_policy, x_gmm, cost
+        return x_rollout, u_rollout, local_policy, cost
+#         return x_rollout, u_rollout, local_policy, x_gmm, cost
