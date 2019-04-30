@@ -1,5 +1,5 @@
 # Hoppingbot
-Closed loop control of hopping bot with RL
+Implementation of Guided Policy Search (GPS) on Hopping Bot
 
 # Files to add:
 - [ ] Algorithm_BADMM.py
