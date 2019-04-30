@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import numpy as np
+from scipy.stats.mstats import gmean
 import theano.tensor as T
 
 from ilqr import iLQR
@@ -145,7 +146,7 @@ class CartPole(object):
         if us_init == None:
             us_init = np.random.uniform(-1, 1, (self.N, dynamics.action_size))
         ilqr = iLQR(dynamics, cost, self.N,hessians=True)
-        xs, us = ilqr.fit(x0, us_init, on_iteration=self.on_iteration)
+        xs, us = ilqr.fit(x0, us_init, on_iteration=self.on_iteration, tol=1e-12)
         # print(ilqr._K,'this is capital K')
         return xs, us, ilqr._k, ilqr._K
    
@@ -168,8 +169,19 @@ class CartPole(object):
     run_IterLinQuadReg_matrix: this method will run iLQR when we are given A, B, C state-space matrices
                         X(k+1) = A * [X(k) U(k)].T + B ---- Evolution of state over time is governed by this equation
     '''
-    def run_IterLinQuadReg_matrix(self, A, B, C, us_init=None):
+    def run_IterLinQuadReg_matrix(self, A, B, C, dist_info_sharing='GM', us_init=None):
         x_input, u_input = self.state_inputs()
+        if np.ndim(A) != 2:
+            if dist_info_sharing == 'GM':
+                A = gmean(A, axis=0)
+                B = gmean(B, axis=0)
+                C = gmean(C, axis=0)
+            elif dist_info_sharing == 'AM':
+                A = np.sum(A, axis=0)/A.shape[0]
+                B = np.sum(B, axis=0)/B.shape[0]
+                C = np.sum(C, axis=0)/C.shape[0]
+        else:
+            pass
         f = self.next_states_matrix(x_input, u_input, A, B, C)
         dynamics = AutoDiffDynamics(f, x_input, u_input)
         x_goal = self.augment_state(self.x_goal)
