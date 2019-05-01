@@ -5,6 +5,7 @@ Implementation of Guided Policy Search (GPS) on Hopping Bot
 - Update: `sudo apt-get update`
 - Jupyter Notebook: Run `python3 -m pip install --upgrade pip` and then `python3 -m pip install jupyter`
 - Required Dependencies: Run `pip3 install -r requirement.txt`
+- Scikit-Learn: `pip3 install -U scikit-learn`
 - iLQR module: Go to ilqr-master_new and run `python3 setup.py install`
 - GPU Drivers: To install drivers for Nvidia which are needed for running GPU follow the instructions in the following [link](https://www.tensorflow.org/install/gpu). Check if drivers are connected and they are responding by running `nvidia-smi`. This may give lot troubles hence be patient but this is the most hard part of installation, after this done you are all set. If you can't install tensorflow-gpu then just use tensorlfow-cpu, it should be fine. 
 - MUJOCO: To install go to following [link](http://www.mujoco.org/). There you can install student license version of this software. This may take time please by patient, but should be easier than above.
