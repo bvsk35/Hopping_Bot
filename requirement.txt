@@ -1,0 +1,10 @@
+numpy
+scipy
+matplotlib
+seaborn
+gym
+gym[atari]
+keras
+opencv-python
+tensorflow-gpu
+Theano
