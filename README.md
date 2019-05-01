@@ -31,21 +31,23 @@ Implementation of Guided Policy Search (GPS) on Hopping Bot
 - [x] Linear_Gauss_Policy.py
 - [x] GPS_General_Utils.py
 - [x] Policy.py
+- [x] GMM.py
 
 # TODO:
+- [x] Add fully working `GMM.py`. 
 - [x] Test MUJOCO Cart Pole and write function to extract states, send control and to control rendering. 
 - [x] Figure out what does the following function do `class BundleType`.
 - [x] Figure out what does the following function do `func extract_condition`.
 - [x] Add function to calculate nominal trajectories using state dynamic matrices given by GMM.
 - [x] Install TensorFlow GPU in both Python 2 and Python 3.
 - [x] In GitHub add result folder and simulator results.
-- [ ] All the Cost files and remaining files depend on hyperparameter file. Now work with Agent.py and Hyperparams.py file.
+- [ ] All the Cost files and remaining files depend on hyperparameter file. Now work with `Agent.py` and `Hyperparams.py` file.
 - [x] Recheck the files required for Trajectory Optimization.
-- [x] Add functio to calculate the nominal states and actions (i.e. iLQR optimized) using state dynamic matrices given by GMM. 
+- [x] Add function to calculate the nominal trajectory (i.e. iLQR optimized) using state dynamic matrices given by GMM. 
 - [ ] Look how cost functions are written and how they are generalized?
 - [ ] Read more about Agent.py file. What is the function of this file? Where it is called?
-- [ ] Understand how Traj_Opt_Utils.py computes KL-Divergence.
-- [ ] Do we need noise patterns in the LinearGaussianPolicy file?
+- [ ] Understand how `Traj_Opt_Utils.py` computes KL-Divergence.
+- [ ] Do we need noise patterns in the `LinearGaussianPolicy.py` file?
 - [ ] Figure out what is Policy GMM and why are they are using it? Where does the code for Policy go? Where it is called?
 - [ ] Figure out what these files do: `gps.py` (main file).
 - [ ] Figure out what these files do: `PolicyOptCaffe.py` (then modify it into tensorflow based policy).
