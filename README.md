@@ -6,8 +6,9 @@ Implementation of Guided Policy Search (GPS) on Hopping Bot
 - Jupyter Notebook: Run `python3 -m pip install --upgrade pip` and then `python3 -m pip install jupyter`
 - Required Dependencies: Run `pip3 install -r requirement.txt`
 - iLQR module: Go to ilqr-master_new and run `python3 setup.py install`
-- GPU Drivers: To install drivers for Nvidia which are needed for running GPU follow the instructions in the following [link](https://www.tensorflow.org/install/gpu). Check if drivers are connected and they are responding by running `nvidia-smi`.
-- Update and reboot (not necessary but recommened): `sudo apt-get update && sudo reboot`
+- GPU Drivers: To install drivers for Nvidia which are needed for running GPU follow the instructions in the following [link](https://www.tensorflow.org/install/gpu). Check if drivers are connected and they are responding by running `nvidia-smi`. This may give lot troubles hence be patient but this is the most hard part of installation, after this done you are all set. If you can't install tensorflow-gpu then just use tensorlfow-cpu, it should be fine. 
+- MUJOCO: To install go to following [link](http://www.mujoco.org/). There you can install student license version of this software. This may take time please by patient, but should be easier than above.
+- Update and reboot (not necessary but recommened): `sudo apt-get update && sudo reboot`.
 - Finally run `TrajGenerator-V2.ipynb`
 
 # Files to add:
@@ -40,6 +41,7 @@ Implementation of Guided Policy Search (GPS) on Hopping Bot
 - [x] Figure out what does the following function do `func extract_condition`.
 - [x] Add function to calculate nominal trajectories using state dynamic matrices given by GMM.
 - [x] Install TensorFlow GPU in both Python 2 and Python 3.
+- [x] Install MUJOCO on PC. 
 - [x] In GitHub add result folder and simulator results.
 - [ ] All the Cost files and remaining files depend on hyperparameter file. Now work with `Agent.py` and `Hyperparams.py` file.
 - [x] Recheck the files required for Trajectory Optimization.
