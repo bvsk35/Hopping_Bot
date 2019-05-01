@@ -71,6 +71,7 @@ class Mujoco_sim():
                   np.cos(self.sim.data.qpos[1]),self.sim.data.qvel[1]].T
             control = np.dot(self.K[i,:],(current - self.xs[i].reshape(5,1) ))  + self.k[i] + self.us[i]
             self.sim.data.ctrl[0] = control
+            self.sim.forward()
             self.sim.step()
             if self.CondViewer:
                 viewer.render()
