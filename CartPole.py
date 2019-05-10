@@ -169,16 +169,18 @@ class CartPole(object):
     run_IterLinQuadReg_matrix: this method will run iLQR when we are given A, B, C state-space matrices
                         X(k+1) = A * [X(k) U(k)].T + B ---- Evolution of state over time is governed by this equation
     '''
-    def run_IterLinQuadReg_matrix(self, A, B, C, dist_info_sharing='GM', us_init=None):
+    def run_IterLinQuadReg_matrix(self, A, B, C, dist_info_sharing='AM', us_init=None):
         x_input, u_input = self.state_inputs()
         if np.ndim(A) != 2:
             if dist_info_sharing == 'GM':
                 A = gmean(A, axis=0)
                 B = gmean(B, axis=0)
                 C = gmean(C, axis=0)
+                print(A.shape,'A', B.shape,'B',C.shape,'C')
             elif dist_info_sharing == 'AM':
                 A = np.sum(A, axis=0)/A.shape[0]
-                B = np.sum(B, axis=0)/B.shape[0]
+                B = np.sum(B, axis=0, keepdims=True)/B.shape[0]
+                B = B.T
                 C = np.sum(C, axis=0)/C.shape[0]
         else:
             pass

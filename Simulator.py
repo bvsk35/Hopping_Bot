@@ -48,6 +48,8 @@ class Mujoco_sim():
         self.xs = state_vector
         self.us = control_vector
         self.N = N
+        self.total_controls = []
+        self.state = []
 
 
     def runSimulation(self, getData = False):
@@ -59,23 +61,46 @@ class Mujoco_sim():
             viewer = mujoco_py.MjViewer(self.sim)
         for i in range(self.N):
             if i == 0:
-                state = np.append(self.sim.data.qpos,self.sim.data.qvel)
-                state = np.expand_dims(state,1)
+                self.state = np.append(self.sim.data.qpos,self.sim.data.qvel)
+                self.state = np.expand_dims(self.state,1)
             else:
                 
-                state = np.append(state, 
+                self.state = np.append(state, 
                             np.expand_dims(np.append(self.sim.data.qpos,self.sim.data.qvel),1),axis = 1)
             #the following lines are specific for the cartpole
             #TODO: generalize this to all the simulation
             current = np.c_[self.sim.data.qpos[0],self.sim.data.qvel[0],np.sin(self.sim.data.qpos[1]),
                   np.cos(self.sim.data.qpos[1]),self.sim.data.qvel[1]].T
-            control = np.dot(self.K[i,:],(current - self.xs[i].reshape(5,1) ))  + self.k[i] + self.us[i]
+            control = np.dot(self.K[i,:],(self.xs[i].reshape(5,1) - current))  + self.k[i] + self.us[i]
             self.sim.data.ctrl[0] = control
             self.sim.forward()
             self.sim.step()
+            self.total_controls.append(control)
+
             if self.CondViewer:
                 viewer.render()
             
         if getData:
             print('return the state and dimensions')
-            return state
+            return self.state
+
+    def get_U(self, t=None):
+        """ This will give out all (or t) the control actions applied to the simulator """
+        if t == None:
+            return self.total_controls
+        else:
+            return self.total_controls[:t]
+    
+    def get_X(self, t=None):
+        """ This will give out all (or t) the states including velocity of the system """
+        if t == None:
+            return self.state
+        else:
+            return self.state[:,:t]
+        
+    def getObs(self, t=None):
+        """ This will give out all (or t) the observable states in the system """
+        if t == None:
+            return self.state[:2,:]
+        else:
+            return self.state[;2,:t]

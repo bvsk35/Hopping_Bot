@@ -29,13 +29,7 @@ class Gaussian_Mixture_Model(object):
         self.warmstart = warmstart
         self.sigma = None
         
-    '''
-    This function calculates Log-Likelihoods of the posterior probabilites and to do that it takes a computational 
-    efficient way similar to the calculations of numerically stable softmax. Please refer following links
-    1 - https://en.wikipedia.org/wiki/LogSumExp
-    2 - https://www.hongliangjie.com/2011/01/07/logsum/
-    3 - https://www.xarg.org/2016/06/the-log-sum-exp-trick-in-machine-learning/
-    '''
+    # TODO: ask info by the prof.
     def logsum(self, vec, axis=0, keepdims=True):
         maxv = np.max(vec, axis=axis, keepdims=keepdims)
         maxv[maxv == -float('inf')] = 0
@@ -152,18 +146,18 @@ class Gaussian_Mixture_Model(object):
 
             # Set initial cluster indices.
             if not self.init_sequential:
-                cidx = np.random.randint(0, K, size=(1, N))
+                cidx = np.random.randint(0, K, size=(1, N)) #this is used in shuffling of the data
             else:
                 raise NotImplementedError()
 
             # Initialize.
             for i in range(K):
                 cluster_idx = (cidx == i)[0]
-                mu = np.mean(data[cluster_idx, :], axis=0)
+                mu = np.mean(data[cluster_idx, :], axis=0) #here the random mean for the first time si calculated
                 diff = (data[cluster_idx, :] - mu).T
                 sigma = (1.0 / K) * (diff.dot(diff.T))
-                self.mu[i, :] = mu 
-                self.sigma[i, :, :] = sigma + np.eye(Do) * 2e-6 # Regularization
+                self.mu[i, :] = mu #this is the mean added
+                self.sigma[i, :, :] = sigma + np.eye(Do) * 2e-6 #this is the regularization
 
         prevll = -float('inf')
         for itr in range(max_iterations):
@@ -240,7 +234,7 @@ class Prior_Dynamics_GMM(object):
         self.U = None
         self.gmm = Gaussian_Mixture_Model(init_sequential=init_sequential, eigreg=eigreg, warmstart=warmstart)
 
-    def initial_state(self):
+    def initial_state(self): #this function is not used anywhere in the fil;e
         """ Return dynamics prior for initial time step. """
         # Compute mean and covariance.
         mu0 = np.mean(self.X[:, 0, :], axis=0)
@@ -281,7 +275,7 @@ class Prior_Dynamics_GMM(object):
         self.U = self.U[start:, :]
 
         # Compute cluster dimensionality.
-        Do = X.shape[2] + U.shape[2] + X.shape[2]  #TODO: Use Xtgt.
+        Do = X.shape[2] + U.shape[2] + X.shape[2]  
 
         # Create dataset.
         N = self.X.shape[0]
@@ -303,7 +297,8 @@ class Prior_Dynamics_GMM(object):
         Args:
             pts: A N x Dx+Du+Dx matrix.
         """
-        # Construct query data point by rearranging entries and adding in reference.
+        # Construct query data point by rearranging entries and adding
+        # in reference.
         assert pts.shape[1] == Dx + Du + Dx
 
         # Perform query and fix mean.
@@ -328,8 +323,9 @@ class Estimated_Dynamics_Prior(object):
                                         min_samples_per_cluster=20, max_clusters=50, max_samples=20, strength=1.0)
 
     def update_prior(self, X, U):
-        """ Update dynamics prior i.e. do GMM. """
+        """ Update dynamics prior. """
         self.prior.update(X, U)
+        #this is the function where the gmm happens
     
     def gauss_fit_joint_prior(self, pts, mu0, Phi, m, n0, dwts, dX, dU, sig_reg):
         """ Perform Gaussian fit to data with a prior. """
