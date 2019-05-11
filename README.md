@@ -12,6 +12,17 @@ Implementation of Guided Policy Search (GPS) on Hopping Bot
 - Update and reboot (not necessary but recommened): `sudo apt-get update && sudo reboot`.
 - Finally run `TrajGenerator-V2.ipynb`
 
+# Information regarding Hopper:
+![Hopper](Hopper.png)
+- Bodies: Torso, Thigh, Leg, Foot (kinematic chain in order as per xml file)
+- Torso: X: Slider, Y: Hinge, Z: Slider i.e, we have only linear movement in X, Z direction. 
+  And we have rotation in Y direction.
+- Thigh: Hinge joint in Y axis. Angle limit [-150, 0] degrees, Fricition 0.9.
+- Leg: Hinge joint in Y axis. Angle limit [-150, 0] degrees, Fricition 0.9.
+- Foot: Hinge joint in Y axis. Angle limit [-150, 0] degrees, Fricition 2.0.
+- States: X = [ZPos, XPos, YPos, YDeg, YDeg, YDeg] in the order of kinematic links. 
+  Velocities will also be in the same order.
+
 # Files to add:
 - [ ] Algorithm_BADMM.py
 - [ ] Trajectory_Opt_LQR.py
@@ -21,7 +32,7 @@ Implementation of Guided Policy Search (GPS) on Hopping Bot
 - [ ] Agent_Utils.py
 - [ ] Sample.py
 - [ ] Sample_List.py
-- [ ] Agent_Config.py
+- [x] Agent_Config.py
 - [x] Cost_Sum.py
 - [x] Cost_State.py
 - [x] Cost_Action.py
@@ -56,4 +67,5 @@ Implementation of Guided Policy Search (GPS) on Hopping Bot
 - [ ] Figure out what these files do: `PolicyOptCaffe.py` (then modify it into tensorflow based policy).
 - [ ] Figure out what these files do: `gps.gui.config.py` (Rendering plus GUI can we make our code without using this?).
 - [ ] Figure out what these files do: `gps.proto.gps_pb2.py` (can we make our code without using this?).
+- [ ] Add information regarding CartPole simulator in Readme file. 
 
