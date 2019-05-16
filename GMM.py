@@ -2,6 +2,8 @@ import numpy as np
 import scipy.linalg as linalg
 
 """
+Author: Sameer
+Date: May 2019
 This file contains three classes. Purpose of this file is fit a Gaussian Mixture Model on the given
     Data:
         X: Rollouts x Trajectory steps x Data_dimension_X

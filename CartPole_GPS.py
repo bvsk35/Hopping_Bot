@@ -7,6 +7,11 @@ from ilqr.cost import QRCost_GPS
 from ilqr.dynamics import constrain
 from ilqr.dynamics import AutoDiffDynamics
 
+'''
+Author: Sameer
+Date: May 2019
+'''
+
 class CartPole_GPS(object):
     '''
     __init__: in this method we store all the variables required for formulating the Cart Pole iLQR problem.

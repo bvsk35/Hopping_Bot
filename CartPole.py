@@ -8,6 +8,11 @@ from ilqr.cost import QRCost
 from ilqr.dynamics import constrain
 from ilqr.dynamics import AutoDiffDynamics
 
+'''
+Author: Sameer
+Date: May 2019
+'''
+
 class CartPole(object):
     '''
     __init__: in this method we store all the variables required for formulating the Cart Pole iLQR problem.
@@ -107,7 +112,7 @@ class CartPole(object):
             T.sin(next_theta),
             T.cos(next_theta),
             X[4] + ang_acc * self.dt,
-        ])
+        ]).T
         return f
     
     '''
@@ -136,7 +141,7 @@ class CartPole(object):
         x_input, u_input = self.state_inputs()
         x_dot_dot, theta_dot_dot, theta_prime = self.accel(x_input, u_input, self.xd)
         f = self.next_states(x_input, x_dot_dot, theta_dot_dot, theta_prime)
-        dynamics = AutoDiffDynamics(f, x_input, u_input,hessians=True)
+        dynamics = AutoDiffDynamics(f, x_input, u_input,hessians=False)
         x_goal = self.augment_state(self.x_goal)
         if self.Q_terminal.all() == None:
             cost = QRCost(self.Q, self.R)
@@ -145,8 +150,8 @@ class CartPole(object):
         x0 = self.augment_state(self.x0)
         if us_init == None:
             us_init = np.random.uniform(-1, 1, (self.N, dynamics.action_size))
-        ilqr = iLQR(dynamics, cost, self.N,hessians=True)
-        xs, us = ilqr.fit(x0, us_init, on_iteration=self.on_iteration, tol=1e-12)
+        ilqr = iLQR(dynamics, cost, self.N,hessians=False)
+        xs, us = ilqr.fit(x0, us_init, on_iteration=self.on_iteration, n_iterations=1000)
         # print(ilqr._K,'this is capital K')
         return xs, us, ilqr._k, ilqr._K
    

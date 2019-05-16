@@ -71,8 +71,9 @@ class Mujoco_sim():
             #TODO: generalize this to all the simulation
             current = np.c_[self.sim.data.qpos[0],self.sim.data.qvel[0],np.sin(self.sim.data.qpos[1]),
                   np.cos(self.sim.data.qpos[1]),self.sim.data.qvel[1]].T
+            # TODO: Send param switch to change control signal from us to feedback control signal
             control = np.dot(self.K[i,:],(self.xs[i].reshape(5,1) - current))  + self.k[i] + self.us[i]
-            self.sim.data.ctrl[0] = control
+            self.sim.data.ctrl[0] = self.us[i]
             self.sim.forward()
             self.sim.step()
             self.total_controls.append(control)
@@ -103,4 +104,4 @@ class Mujoco_sim():
         if t == None:
             return self.state[:2,:]
         else:
-            return self.state[;2,:t]
+            return self.state[:2,:t]
