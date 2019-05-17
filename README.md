@@ -83,6 +83,6 @@ Most of the code was written by taking inspiration from the original publishers 
 - [ ] Figure out what these files do: `gps.py` (main file).
 - [ ] Figure out what these files do: `PolicyOptCaffe.py` (then modify it into tensorflow based policy).
 - [ ] Figure out what these files do: `gps.gui.config.py` (Rendering plus GUI can we make our code without using this?).
-- [ ] Figure out what these files do: `gps.proto.gps_pb2.py` (can we make our code without using this?).
+- [x] Figure out what these files do: `gps.proto.gps_pb2.py` (can we make our code without using this?).
 - [ ] Add information regarding CartPole simulator in Readme file. 
 
