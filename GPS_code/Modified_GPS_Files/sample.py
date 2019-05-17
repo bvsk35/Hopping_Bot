@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-#date created: May 16 2019 by Prakyath K
-
 import numpy as np
 #IMPORTANT: the helper fnc pack_data_x and pack_data_obs are in agent file for some
 #weird reason In future we have to see how to add in the sample class and not in the 
