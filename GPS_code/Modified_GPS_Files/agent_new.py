@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-#date created: May 16 2019 by Prakyath K
-
 import numpy as np
 import abc
 
