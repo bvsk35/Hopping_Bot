@@ -1,5 +1,21 @@
 # Hoppingbot
-Implementation of Guided Policy Search (GPS) on Hopping Bot
+Implementation of Guided Policy Search (GPS) on Hopping Bot.
+
+# Unstable
+This repo has been public for educational purposes and contribution are welcomed. I have stopped working on this
+due to some ethical reasons in my previous work place, but if someone else wants to take this up and wants to 
+collabarate with me, you are more than welcomed. Below have I provided a glimpse of all the TODO tasks. 
+Idea and majoritiy of work was envisioned and done by me (even building this Readme.md file, for which I was not given any credits for my contribution :( ). 
+
+It goes without saying that I would like to offer my thanks (even though that is insignificant) to Chelesa Finn (professor at Stanford) and S. Levine (professor at UC Berkley) (of course many others who contributed in developing this) for making their code an open source and making their work on GPS public. I would like offer my thanks for their generous contribution to the field of Reinforcement Learning. 
+
+This code is unstable and needs lots of polishing. Many parts of the code are still under development. Currently,
+I am working out the math required and re-deriving all the important equations of the GPS (please refer to S. Levine thesis on learning motor skills).
+
+# Cite
+Following people must be cited for their online/open source work [iLQR](https://github.com/anassinator/ilqr), [GPS](http://rll.berkeley.edu/gps/), [OpenAI](https://github.com/openai). Also commerical softwares like [MUJOCO](http://www.mujoco.org/). 
+
+Most of the code was written by taking inspiration from the original publishers but I have added my flavour. I have trimmed code for our purposes or I have added other functionalities. Please cite me if you are using this repository: `Author: Sameer Kumar; Date: May 17th 2019; Title: GPS on Hopping task; Designation and School: Phd student in Texas A&M`. That date corresponds to when I made this code public. Also for contact information you can refer to my [website](https://sites.google.com/view/bvsk35/home?authuser=0).  
 
 # How to Install
 - Update: `sudo apt-get update`
@@ -55,11 +71,12 @@ Implementation of Guided Policy Search (GPS) on Hopping Bot
 - [x] Install TensorFlow GPU in both Python 2 and Python 3.
 - [x] Install MUJOCO on PC. 
 - [x] In GitHub add result folder and simulator results.
-- [ ] All the Cost files and remaining files depend on hyperparameter file. Now work with `Agent.py` and `Hyperparams.py` file.
+- [x] Write `Agent.py` files.
 - [x] Recheck the files required for Trajectory Optimization.
 - [x] Add function to calculate the nominal trajectory (i.e. iLQR optimized) using state dynamic matrices given by GMM. 
-- [ ] Look how cost functions are written and how they are generalized?
-- [ ] Read more about Agent.py file. What is the function of this file? Where it is called?
+- [x] Read more about Agent.py file. What is the function of this file? Where it is called?
+- [ ] Write the `Cost.py` files. Look how cost functions are written and how they are generalized?
+- [ ] Write `Hyperparameter.py` files. 
 - [ ] Understand how `Traj_Opt_Utils.py` computes KL-Divergence.
 - [ ] Do we need noise patterns in the `LinearGaussianPolicy.py` file?
 - [ ] Figure out what is Policy GMM and why are they are using it? Where does the code for Policy go? Where it is called?
