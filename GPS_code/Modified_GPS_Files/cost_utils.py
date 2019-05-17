@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 
-#date created: May 16 2019 by sameer
-
-
-
 class cost_utils(object):
     '''
     init: start the function with some important parameters
