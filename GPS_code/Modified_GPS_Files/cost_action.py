@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 
-#date created: May 16 2019 by Prakyath K
-
 import numpy as np 
 import copy
-
+from hyperparameters import Cost_Action
 
 class CostAction():
-    def __init__(self,hyperparams):
+    def __init__(self):
         #send cost dic in the hyperparams file
+        hyperparams = Cost_Action
         config = copy.deepcopy(hyperparams)
         config.update(hyperparams)
         self._hyperparams = config
