@@ -4,7 +4,7 @@ Implementation of Guided Policy Search (GPS) on Hopping Bot.
 # Unstable
 This repo has been public for educational purposes and contribution are welcomed. I have stopped working on this, but if someone else wants to take this up and wants to collabarate with me, you are more than welcomed. Below have I provided a glimpse of all the TODO tasks. 
 
-It goes without saying that I would like to offer my than to Chelesa Finn (professor at Stanford) and S. Levine (professor at UC Berkley) (of course many others who contributed in developing this) for making their code an open source and making their work on GPS public. I would like offer my thanks for their generous contribution to the field of Reinforcement Learning. 
+It goes without saying that I would like to offer my thanks to Chelesa Finn (professor at Stanford) and S. Levine (professor at UC Berkley) (and many others who contributed in developing this) for making their code an open source and making their work on GPS public. I would like offer my thanks for their generous contribution to the field of Reinforcement Learning. 
 
 This code is unstable and needs lots of polishing. Many parts of the code are still under development. Currently,
 I am working out the math required and re-deriving all the important equations of the GPS (please refer to S. Levine thesis on learning motor skills).
